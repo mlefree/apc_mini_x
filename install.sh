@@ -2,7 +2,7 @@
 
 set -o errexit -o nounset
 
-PROJECTS=('mle')
+PROJECTS=('mle' 'mle2')
 
 ABLETON_HOME="$HOME/Music/Ableton/User Library"
 ABLETON_MRS="$ABLETON_HOME/Remote Scripts"

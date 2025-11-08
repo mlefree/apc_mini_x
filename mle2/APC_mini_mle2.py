@@ -525,8 +525,8 @@ class MetronomeMode(ModeBase):
         return False
 
 
-#class APC_mini_mle(APC_mini):
-class APC_mini_mle(APC_Key_25):
+#class APC_mini_mle2(APC_mini):
+class APC_mini_mle2(APC_Key_25):
     # @Overridden
     SESSION_HEIGHT = 8
     # @Overridden
@@ -546,14 +546,22 @@ class APC_mini_mle(APC_Key_25):
     quantizeMode = 5
     mode = None
 
+    # Cascading record state
+    cascade_active = False
+    cascade_track_index = -1
+    cascade_start_clip_index = -1
+    cascade_current_clip_index = -1
+    cascade_clip_listener = None
+    cascade_expected_beats = 0  # Expected recording length in beats
+
     # @Overridden
     def __init__(self, *a, **k):
-        #super(APC_mini_mle, self).__init__(*a, **k)
-        (super(APC_mini_mle, self).__init__)(*a, **k)
+        #super(APC_mini_mle2, self).__init__(*a, **k)
+        (super(APC_mini_mle2, self).__init__)(*a, **k)
         with self.component_guard():
             self.register_disconnectable(SimpleLayerOwner(layer=Layer(_unused_buttons=(self.wrap_matrix(self._unused_buttons)))))
 
-        self.log_message("MLE - Fixed bar length mode")
+        self.log_message("MLE2 - Cascading Record Mode")
         self.set_fixed_record_bar_length(self.RECORD_BAR_LENGTH)
         self._suppress_send_midi = False
         self.mode = None
@@ -565,13 +573,13 @@ class APC_mini_mle(APC_Key_25):
 
     # @Overridden
     def _create_controls(self):
-        super(APC_mini_mle, self)._create_controls()
+        super(APC_mini_mle2, self)._create_controls()
         self._unused_buttons = list(map(self.make_shifted_button, self._scene_launch_buttons[5:7]))
         self._master_volume_control = make_slider(0, 56, name='Master_Volume')
 
     # @Overridden
     def _create_mixer(self):
-        mixer = super(APC_mini_mle, self)._create_mixer()
+        mixer = super(APC_mini_mle2, self)._create_mixer()
         mixer.master_strip().layer = Layer(volume_control=(self._master_volume_control))
         return mixer
 
@@ -586,6 +594,158 @@ class APC_mini_mle(APC_Key_25):
 
     def getClipIndex(self, note):
         return 7 - int((note - self.getTrackIndex(note)) / 8)
+
+    def _check_cascade_progress(self):
+        """
+        Polling callback to check recording progress and fire next clip anticipatorily.
+
+        Key insight: We fire the NEXT clip during the LAST bar of the current recording,
+        creating seamless transitions with no gap between recordings.
+        """
+        if not self.cascade_active:
+            return
+
+        song = self.song()
+        track = song.tracks[self.cascade_track_index]
+        clip_slot = track.clip_slots[self.cascade_current_clip_index]
+
+        if not clip_slot.has_clip:
+            self.log_message("MLE2: WARNING - Clip disappeared during polling!")
+            return
+
+        clip = clip_slot.clip
+
+        if clip.is_recording:
+            # Monitor recording progress using clip.playing_position
+            # Note: clip.length is unreliable during recording (returns huge internal value)
+            expected_length = self.cascade_expected_beats
+            current_beat = clip.playing_position
+
+            # Anticipatory firing: trigger next clip at 75% of current recording
+            # For 4-bar (16 beat) loops: fires at beat 12, giving 4 beats overlap
+            # Adjust CASCADE_FIRE_THRESHOLD (0.75) to change timing:
+            #   0.75 = last 25% (1 bar for 4-bar loops) - RECOMMENDED
+            #   0.5 = last 50% (2 bars for 4-bar loops)
+            #   0.9 = last 10% (very tight timing, may cause issues)
+            CASCADE_FIRE_THRESHOLD = 0.75
+
+            if current_beat >= expected_length * CASCADE_FIRE_THRESHOLD and not hasattr(self, 'cascade_next_fired'):
+                self.log_message("MLE2 Cascade: Reached " + str(int(CASCADE_FIRE_THRESHOLD * 100)) + "% at beat " +
+                               str(round(current_beat, 1)) + "/" + str(expected_length) + ", firing next clip")
+                self.cascade_next_fired = True
+                self._continue_cascade()
+                return
+
+            # Still recording, check again in 1 tick (~10-20ms)
+            self.schedule_message(1, self._check_cascade_progress)
+        else:
+            # Recording finished - this is fallback in case anticipatory firing didn't work
+            if hasattr(self, 'cascade_next_fired'):
+                delattr(self, 'cascade_next_fired')
+                # Next clip already fired, nothing to do
+            else:
+                # Anticipatory firing didn't happen, fire now (will have slight delay)
+                self.log_message("MLE2 Cascade: Clip finished recording at row " + str(self.cascade_current_clip_index))
+                self._continue_cascade()
+
+    def _continue_cascade(self):
+        """
+        Continue cascade to next row or complete and play first clip.
+
+        Called when:
+        1. Anticipatory firing (at 75% of current recording) - seamless
+        2. After recording finishes (fallback) - slight delay
+        """
+        song = self.song()
+        track = song.tracks[self.cascade_track_index]
+
+        # Move to next row (row + 1, cascading downward)
+        next_clip_index = self.cascade_current_clip_index + 1
+
+        # Check cascade completion conditions
+        if next_clip_index >= 8 or track.clip_slots[next_clip_index].has_clip:
+            # Cascade complete: reached bottom (row 7) or encountered occupied slot
+            self.log_message("MLE2 Cascade: Complete! Playing first clip at row " + str(self.cascade_start_clip_index))
+            self.cascade_active = False
+
+            # Clean up state flags
+            if hasattr(self, 'cascade_next_fired'):
+                delattr(self, 'cascade_next_fired')
+
+            # Stop the last recorded clip if it's playing
+            current_clip_slot = track.clip_slots[self.cascade_current_clip_index]
+            if current_clip_slot.has_clip and current_clip_slot.clip.is_playing:
+                current_clip_slot.clip.stop()
+
+            # Fire the first clip to start playback of the entire cascade
+            first_clip_slot = track.clip_slots[self.cascade_start_clip_index]
+            if first_clip_slot.has_clip:
+                first_clip_slot.fire()
+                self.log_message("MLE2 Cascade: Started playback from row " + str(self.cascade_start_clip_index))
+            else:
+                self.log_message("MLE2 Cascade: ERROR - First clip missing at row " + str(self.cascade_start_clip_index))
+            return
+
+        # Continue cascading: prepare next clip
+        if hasattr(self, 'cascade_next_fired'):
+            delattr(self, 'cascade_next_fired')
+
+        self.cascade_current_clip_index = next_clip_index
+        next_clip_slot = track.clip_slots[next_clip_index]
+
+        # Calculate bars for this track
+        last_bars = self.fixed_record_bar_length()
+        if last_bars == 0:
+            last_bars = 8
+
+        bars = last_bars
+        if self.cascade_track_index == 0:
+            bars = 1
+        elif self.cascade_track_index == 1 or self.cascade_track_index == 2:
+            bars = 2
+        elif self.cascade_track_index == 3 or self.cascade_track_index == 4:
+            bars = 4
+
+        beatsPerBar = int(song.signature_numerator)
+        beats = bars * beatsPerBar
+
+        self.log_message("MLE2 Cascade: Recording next clip at row " + str(next_clip_index) + " with " + str(beats) + " beats")
+
+        # Store expected recording length for anticipatory firing
+        self.cascade_expected_beats = beats
+
+        # Start recording next clip
+        track.arm = True
+        next_clip_slot.fire(beats)
+
+        # Wait for clip to be created before starting polling
+        self.schedule_message(2, lambda: self._start_cascade_polling(0))
+
+    def _start_cascade_polling(self, retry_count=0):
+        """
+        Start polling for cascade progress once clip is created.
+
+        After firing a clip with fire(beats), Ableton needs a few ticks to create
+        the clip object. We retry until the clip exists, then start monitoring progress.
+        """
+        if not self.cascade_active:
+            return
+
+        song = self.song()
+        track = song.tracks[self.cascade_track_index]
+        clip_slot = track.clip_slots[self.cascade_current_clip_index]
+
+        if clip_slot.has_clip:
+            # Clip created, begin monitoring its recording progress
+            self.log_message("MLE2: Monitoring row " + str(self.cascade_current_clip_index))
+            self._check_cascade_progress()
+        else:
+            # Clip not created yet, retry up to 100 times (~2 seconds max)
+            if retry_count < 100:
+                self.schedule_message(1, lambda: self._start_cascade_polling(retry_count + 1))
+            else:
+                self.log_message("MLE2: ERROR - Clip creation timeout after 100 retries, aborting cascade")
+                self.cascade_active = False
 
     def _releaseShiftMenu(self, midi_bytes):
 
@@ -635,20 +795,20 @@ class APC_mini_mle(APC_Key_25):
         song = self.song()
         note = midi_bytes[1]
 
-        self.log_message("MLE _applyShiftMenu: note=" + str(note))
+        self.log_message("MLE2 _applyShiftMenu: note=" + str(note))
 
         if note == SHIFT_KEY:
             self.shiftPressed = True
             self.show_message("Shift + row 6 = metronome, row 7= undo")
-            self.log_message("MLE: SHIFT pressed")
+            self.log_message("MLE2: SHIFT pressed")
 
         if note == 88 and self.shiftPressed:
-            self.log_message("MLE: UNDO triggered")
+            self.log_message("MLE2: UNDO triggered")
             song.undo()
             return True
 
         if note == 87 and self.shiftPressed:
-            self.log_message("MLE: METRONOME toggle")
+            self.log_message("MLE2: METRONOME toggle")
             song.tempo = round(song.tempo)
             song.metronome = not song.metronome
             return True
@@ -656,7 +816,7 @@ class APC_mini_mle(APC_Key_25):
         # Double tap on note key => quantize
         now = int(round(time.time() * 1000))
         if note < 64:
-            self.log_message("MLE: Grid pad pressed, note=" + str(note))
+            self.log_message("MLE2: Grid pad pressed, note=" + str(note))
 
             trackIndex = self.getTrackIndex(note)
             track = song.tracks[trackIndex]
@@ -683,13 +843,13 @@ class APC_mini_mle(APC_Key_25):
 
         # Recording launch on one note
         if note < 64:
-            self.log_message("MLE: Entering recording logic for note " + str(note))
+            self.log_message("MLE2: Entering recording logic for note " + str(note))
             trackIndex = self.getTrackIndex(note)
             track = song.tracks[trackIndex]
             clipIndex = self.getClipIndex(note)
             clipSlot = track.clip_slots[clipIndex]
 
-            self.log_message("MLE: Track=" + str(trackIndex) + ", Clip=" + str(clipIndex) +
+            self.log_message("MLE2: Track=" + str(trackIndex) + ", Clip=" + str(clipIndex) +
                            ", has_clip=" + str(clipSlot.has_clip) +
                            ", is_group=" + str(clipSlot.is_group_slot))
 
@@ -708,16 +868,37 @@ class APC_mini_mle(APC_Key_25):
 
             beatsPerBar = int(song.signature_numerator)
             beats = bars * beatsPerBar
-            self.log_message("MLE: Calculated bars=" + str(bars) + ", beats=" + str(beats))
+            self.log_message("MLE2: Calculated bars=" + str(bars) + ", beats=" + str(beats))
 
             if not clipSlot.has_clip and not clipSlot.is_group_slot:
-                self.log_message("MLE: STARTING RECORD!")
+                # Start cascading record mode
+                self.log_message("MLE2: STARTING CASCADE RECORD!")
+                self.cascade_active = True
+                self.cascade_track_index = trackIndex
+                self.cascade_start_clip_index = clipIndex
+                self.cascade_current_clip_index = clipIndex
+
+                # Reset cascade flags
+                if hasattr(self, 'cascade_next_fired'):
+                    delattr(self, 'cascade_next_fired')
+                if hasattr(self, 'cascade_completed'):
+                    delattr(self, 'cascade_completed')
+
+                self.log_message("MLE2 Cascade: Starting at row " + str(clipIndex))
+
+                # Store expected recording length for anticipatory firing
+                self.cascade_expected_beats = beats
+
                 track.arm = True
-                self.log_message("MLE: Track armed, firing clip with " + str(beats) + " beats")
+                self.log_message("MLE2: Track armed, firing clip with " + str(beats) + " beats")
                 clipSlot.fire(beats)
+
+                # Start polling to detect when this clip finishes recording
+                self.schedule_message(2, lambda: self._start_cascade_polling(0))
+
                 return True
             else:
-                self.log_message("MLE: Clip exists or is group slot, stopping session_record")
+                self.log_message("MLE2: Clip exists or is group slot, stopping session_record")
                 song.session_record = False
 
         return False
@@ -728,38 +909,38 @@ class APC_mini_mle(APC_Key_25):
         # will cause changes to lights
         if self.mode != None:
             return
-        super(APC_mini_mle, self)._do_send_midi(midi_bytes)
+        super(APC_mini_mle2, self)._do_send_midi(midi_bytes)
 
     # Used by edit modes to echo edit ops as lighting messages unrelated to usual Live clip events
     def really_do_send_midi(self, midi_bytes):
-        super(APC_mini_mle, self)._do_send_midi(midi_bytes)
+        super(APC_mini_mle2, self)._do_send_midi(midi_bytes)
 
     # @Overridden receive_midi
     def receive_midi(self, midi_bytes):
 
-        self.log_message("MLE receive_midi: " + str(midi_bytes))
+        self.log_message("MLE2 receive_midi: " + str(midi_bytes))
         extra_conf_applied = False
 
         # Custom Modes
         if self.mode is not None:
-            self.log_message("MLE: *** IN MENU MODE - Press button 65 to exit ***")
+            self.log_message("MLE2: *** IN MENU MODE - Press button 65 to exit ***")
             self.mode.custom_receive_midi(midi_bytes)
             return
 
         # Shift released or applied
         if midi_bytes[0] & 240 == NOTE_OFF_STATUS:
-            self.log_message("MLE: NOTE_OFF detected")
+            self.log_message("MLE2: NOTE_OFF detected")
             extra_conf_applied = self._releaseShiftMenu(midi_bytes)
         elif midi_bytes[0] & 240 == NOTE_ON_STATUS:
-            self.log_message("MLE: NOTE_ON detected - calling _applyShiftMenu")
+            self.log_message("MLE2: NOTE_ON detected - calling _applyShiftMenu")
             extra_conf_applied = self._applyShiftMenu(midi_bytes)
 
         # Transfer to Parent
         if not extra_conf_applied:
-            self.log_message("MLE: Passing to parent class")
-            super(APC_mini_mle, self).receive_midi(midi_bytes)
+            self.log_message("MLE2: Passing to parent class")
+            super(APC_mini_mle2, self).receive_midi(midi_bytes)
         else:
-            self.log_message("MLE: Handled by mle logic")
+            self.log_message("MLE2: Handled by mle2 logic")
 
     def fixed_record_bar_length(self):
         return self.__fixed_record_bar_length
