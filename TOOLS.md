@@ -3,6 +3,8 @@
 This project is compatible with Ableton Live 9+ (tested with Live 12).
 
 ### Embedded file name:
+
+See in `_original/11lite/APC_mini` directory:
 - /Users/versonator/Jenkins/live/output/mac_64_static/Release/python-bundle/MIDI Remote Scripts/APC_mini/__init__.py
 - /Users/versonator/Jenkins/live/output/mac_64_static/Release/python-bundle/MIDI Remote Scripts/APC_mini/APC_mini.py
 
