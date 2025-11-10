@@ -2,6 +2,10 @@
 
 MIDI remote scripts that turn your APC mini into a live looping powerhouse for Ableton Live.
 
+## Requirements
+
+- Ableton Live 9+ (tested with Live 12)
+
 ## Quick Start
 
 1. **Shut down** Ableton Live
@@ -10,6 +14,10 @@ MIDI remote scripts that turn your APC mini into a live looping powerhouse for A
 4. **Restart** Live and select your control surface in Preferences:
 
 ![Control Surface Setup](ableton_live_control.png)
+
+## Developer Tools
+
+See [TOOLS.md](./TOOLS.md) for debugging and development information.
 
 ## The Flavors
 
@@ -25,6 +33,6 @@ Pick your vibe:
 
 ---
 
-*Made for Ableton Live 11 • Hit the pads, loop the beats*
+*Compatible with Ableton Live 9+ (tested with Live 12) • Hit the pads, loop the beats*
 
 

@@ -554,6 +554,13 @@ class APC_mini_mle2(APC_Key_25):
     cascade_clip_listener = None
     cascade_expected_beats = 0  # Expected recording length in beats
 
+    # Scene loop state
+    scene_loop_active = False
+    scene_loop_current_scene = 4  # Start at scene button 5 (clip index 4)
+    scene_loop_last_tap_millis_activate = 0  # For double-tap detection on scene button 5
+    scene_loop_last_tap_millis_deactivate = 0  # For double-tap detection on scene button 1
+    scene_loop_session_id = 0  # Increment each time we activate to invalidate old callbacks
+
     # @Overridden
     def __init__(self, *a, **k):
         #super(APC_mini_mle2, self).__init__(*a, **k)
@@ -747,6 +754,183 @@ class APC_mini_mle2(APC_Key_25):
                 self.log_message("MLE2: ERROR - Clip creation timeout after 100 retries, aborting cascade")
                 self.cascade_active = False
 
+    def _get_scene_max_clip_length(self, scene_index):
+        """
+        Get the maximum clip length (in beats) for all clips in a scene (row).
+        Returns 0 if no clips are found in the scene.
+        """
+        song = self.song()
+        max_length = 0
+
+        for track in song.tracks:
+            if scene_index < len(track.clip_slots):
+                clip_slot = track.clip_slots[scene_index]
+                if clip_slot.has_clip:
+                    clip = clip_slot.clip
+                    if clip.length > max_length:
+                        max_length = clip.length
+
+        return max_length
+
+    def _fire_scene_clips(self, scene_index):
+        """
+        Fire all clips in a scene (row) that have clips.
+        Scene_index is the clip_slots index (0-7), which maps to scene buttons 1-8.
+        """
+        song = self.song()
+        clips_fired = 0
+
+        self.log_message("MLE2 Scene Loop: Firing clips at index " + str(scene_index) +
+                        " (scene button " + str(scene_index + 1) + ")")
+
+        for track in song.tracks:
+            if scene_index < len(track.clip_slots):
+                clip_slot = track.clip_slots[scene_index]
+                if clip_slot.has_clip:
+                    clip_slot.fire()
+                    clips_fired += 1
+                    self.log_message("MLE2 Scene Loop: Fired clip in track " + str(track.name))
+
+        self.log_message("MLE2 Scene Loop: Total fired " + str(clips_fired) + " clips at index " + str(scene_index))
+        return clips_fired
+
+    def _schedule_next_scene(self):
+        """
+        Schedule advancement to next scene based on clip length.
+        Uses calculated delay instead of polling for more reliable timing.
+        """
+        if not self.scene_loop_active:
+            return
+
+        song = self.song()
+
+        # Don't schedule if song is stopped
+        if not song.is_playing:
+            self.log_message("MLE2 Scene Loop: Song stopped, not scheduling next scene")
+            self._deactivate_scene_loop()
+            return
+
+        current_scene = self.scene_loop_current_scene
+
+        # Get the maximum clip length in the current scene
+        max_length_beats = self._get_scene_max_clip_length(current_scene)
+        self.log_message("MLE2 Scene Loop: Scene " + str(current_scene) + " max length = " +
+                        str(max_length_beats) + " beats")
+
+        if max_length_beats == 0:
+            # No clips in this scene, move to next immediately
+            self.log_message("MLE2 Scene Loop: Scene " + str(current_scene) + " has no clips, advancing")
+            self._advance_to_next_scene()
+            return
+
+        # Calculate delay in ticks
+        # tempo is in BPM, so beats per second = tempo / 60
+        # seconds per beat = 60 / tempo
+        # For max_length_beats, total seconds = max_length_beats * (60 / tempo)
+        # Ticks are roughly 100ms each (based on testing), so ticks = (seconds * 1000) / 100 = seconds * 10
+
+        tempo = song.tempo
+        seconds = max_length_beats * (60.0 / tempo)
+        ticks = int(seconds * 10)  # 100ms per tick
+
+        self.log_message("MLE2 Scene Loop: Will advance in " + str(round(seconds, 1)) +
+                        " seconds (" + str(ticks) + " ticks at " + str(tempo) + " BPM)")
+
+        # Schedule the advancement with current session ID
+        current_session = self.scene_loop_session_id
+        self.schedule_message(ticks, lambda: self._advance_to_next_scene(current_session))
+
+    def _advance_to_next_scene(self, session_id):
+        """
+        Advance to the next scene in the loop (scene buttons 5->6->7->8, clip indices 4->5->6->7).
+        session_id: Used to invalidate old scheduled callbacks from previous loop sessions.
+        """
+        # Ignore callbacks from old sessions
+        if session_id != self.scene_loop_session_id:
+            self.log_message("MLE2 Scene Loop: Ignoring callback from old session (ID " +
+                           str(session_id) + " vs current " + str(self.scene_loop_session_id) + ")")
+            return
+
+        if not self.scene_loop_active:
+            return
+
+        song = self.song()
+
+        # If song is stopped, deactivate scene loop
+        if not song.is_playing:
+            self.log_message("MLE2 Scene Loop: Song stopped, deactivating scene loop")
+            self._deactivate_scene_loop()
+            return
+
+        # Move to next scene
+        self.scene_loop_current_scene += 1
+
+        # Wrap back to scene button 5 (clip index 4) after scene button 8 (clip index 7)
+        if self.scene_loop_current_scene > 7:
+            self.scene_loop_current_scene = 4
+            self.log_message("MLE2 Scene Loop: Looping back to scene button 5 (index 4)")
+
+        # Reset timing tracking
+        if hasattr(self, '_scene_loop_started'):
+            delattr(self, '_scene_loop_started')
+        if hasattr(self, '_scene_loop_start_time'):
+            delattr(self, '_scene_loop_start_time')
+
+        # Fire clips in the new scene
+        self._fire_scene_clips(self.scene_loop_current_scene)
+
+        # Schedule advancement to next scene
+        self._schedule_next_scene()
+
+    def _activate_scene_loop(self):
+        """
+        Activate scene loop mode - start looping through scene buttons 5-8 (clip indices 4-7).
+        """
+        self.log_message("MLE2: ACTIVATING SCENE LOOP MODE")
+
+        # Increment session ID to invalidate any pending callbacks from previous sessions
+        self.scene_loop_session_id += 1
+        self.log_message("MLE2 Scene Loop: New session ID = " + str(self.scene_loop_session_id))
+
+        self.scene_loop_active = True
+        self.scene_loop_current_scene = 4  # Scene button 5 = clip index 4
+
+        # Clean up any previous state
+        if hasattr(self, '_scene_loop_started'):
+            delattr(self, '_scene_loop_started')
+        if hasattr(self, '_scene_loop_start_time'):
+            delattr(self, '_scene_loop_start_time')
+
+        song = self.song()
+
+        # Start the transport if not playing
+        if not song.is_playing:
+            self.log_message("MLE2 Scene Loop: Starting transport")
+            song.start_playing()
+
+        # Fire clips in scene button 5 (clip index 4) to start
+        self._fire_scene_clips(self.scene_loop_current_scene)
+
+        # Schedule advancement to next scene
+        self._schedule_next_scene()
+
+        self.show_message("Scene Loop: Active (buttons 5-8)")
+
+    def _deactivate_scene_loop(self):
+        """
+        Deactivate scene loop mode - return to normal operation.
+        """
+        self.log_message("MLE2: DEACTIVATING SCENE LOOP MODE")
+        self.scene_loop_active = False
+
+        # Clean up state
+        if hasattr(self, '_scene_loop_started'):
+            delattr(self, '_scene_loop_started')
+        if hasattr(self, '_scene_loop_start_time'):
+            delattr(self, '_scene_loop_start_time')
+
+        self.show_message("Scene Loop: Deactivated")
+
     def _releaseShiftMenu(self, midi_bytes):
 
         song = self.song()
@@ -801,6 +985,32 @@ class APC_mini_mle2(APC_Key_25):
             self.shiftPressed = True
             self.show_message("Shift + row 6 = metronome, row 7= undo")
             self.log_message("MLE2: SHIFT pressed")
+
+        # Scene button 5 (note 86) - Double tap to activate scene loop
+        if note == 86:
+            now = int(round(time.time() * 1000))
+            if now - self.scene_loop_last_tap_millis_activate < 500:
+                # Double tap detected - activate scene loop
+                self._activate_scene_loop()
+                self.scene_loop_last_tap_millis_activate = 0  # Reset to prevent triple-tap
+                return True
+            else:
+                # First tap - record time
+                self.scene_loop_last_tap_millis_activate = now
+                return False
+
+        # Scene button 1 (note 82) - Double tap to deactivate scene loop
+        if note == 82:
+            now = int(round(time.time() * 1000))
+            if now - self.scene_loop_last_tap_millis_deactivate < 500:
+                # Double tap detected - deactivate scene loop
+                self._deactivate_scene_loop()
+                self.scene_loop_last_tap_millis_deactivate = 0  # Reset to prevent triple-tap
+                return True
+            else:
+                # First tap - record time
+                self.scene_loop_last_tap_millis_deactivate = now
+                return False
 
         if note == 88 and self.shiftPressed:
             self.log_message("MLE2: UNDO triggered")

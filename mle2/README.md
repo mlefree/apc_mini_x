@@ -59,6 +59,8 @@ All from **one button press**.
 │  Col 5-7: 8 bars  (atmospheres)     │
 │                                      │
 │  [Scene Launch Buttons]             │
+│  Row 1: SCENE LOOP OFF (double-tap) │
+│  Row 5: SCENE LOOP ON (double-tap)  │
 │  Row 6: METRONOME (with Shift)      │
 │  Row 7: UNDO (with Shift)           │
 │  Row 8: STOP ALL CLIPS              │
@@ -111,6 +113,31 @@ Same as **mle**:
 - **Quantize**: Double-tap clip (1/16 + 1/16T)
 - **Undo**: Shift + scene 7 button
 - **Metronome**: Shift + scene 6 button
+
+### Scene Loop Mode
+
+A powerful performance feature that cycles through scenes 5-8 automatically:
+
+**Activate**: Double-tap scene button 5
+**Deactivate**: Double-tap scene button 1
+
+**How it works**:
+1. Double-tap scene button 5 to start the loop
+2. All clips in scene 5 (row 5) start playing
+3. After the maximum clip length in scene 5 completes, scene 6 automatically starts
+4. This continues through scenes 5 → 6 → 7 → 8 → back to 5
+5. The loop continues until you deactivate it by double-tapping scene button 1
+
+**Use cases**:
+- Create evolving song sections that automatically progress
+- Build verse → chorus → bridge → outro sequences
+- Live performance arrangements with hands-free transitions
+- Layered textures that develop over time
+
+**Tips**:
+- Scenes can have different length clips - the system waits for the longest clip to finish
+- Empty scenes are skipped automatically
+- You can still trigger other clips/scenes manually while the loop is running
 
 ## Advanced Menu
 
@@ -193,6 +220,12 @@ cascade_track_index = -1            # Which track (column)?
 cascade_start_clip_index = -1      # Starting row (for playback)
 cascade_current_clip_index = -1    # Current recording row
 cascade_expected_beats = 0          # Expected length of recording (for anticipatory firing)
+
+# Scene loop state
+scene_loop_active = False           # Is scene loop running?
+scene_loop_current_scene = 5        # Current scene being played (5-8)
+scene_loop_last_tap_millis_activate = 0    # Double-tap detection for scene 5
+scene_loop_last_tap_millis_deactivate = 0  # Double-tap detection for scene 1
 ```
 
 **Key innovation**: Instead of waiting for recording to finish, we fire the next clip during the **last bar** of the current recording, creating seamless transitions with no gap.
@@ -347,6 +380,122 @@ def _start_cascade_polling(self, retry_count=0):
 ```
 
 **Key timing**: Next clip fires at 75% of current recording, creating 25% overlap (1 bar for 4-bar loops).
+
+## Scene Loop Components
+
+### 1. Activation/Deactivation
+
+**Method**: `_activate_scene_loop()` / `_deactivate_scene_loop()`
+
+**Triggered by**: Double-tap on scene button 5 (note 86) to activate, scene button 1 (note 82) to deactivate
+
+```python
+# In _applyShiftMenu():
+if note == 86:  # Scene button 5
+    now = int(round(time.time() * 1000))
+    if now - self.scene_loop_last_tap_millis_activate < 500:
+        self._activate_scene_loop()  # Double-tap detected
+```
+
+**Activation logic**:
+1. Set `scene_loop_active = True`
+2. Reset to scene 5
+3. Fire all clips in scene 5
+4. Start progress monitoring
+
+### 2. Scene Clip Management
+
+**Method**: `_fire_scene_clips(scene_index)`
+
+Fires all clips across all tracks in a given scene (row):
+```python
+for track in song.tracks:
+    if scene_index < len(track.clip_slots):
+        clip_slot = track.clip_slots[scene_index]
+        if clip_slot.has_clip:
+            clip_slot.fire()
+```
+
+**Method**: `_get_scene_max_clip_length(scene_index)`
+
+Finds the longest clip in a scene to determine when to advance:
+```python
+max_length = 0
+for track in song.tracks:
+    if clip_slot.has_clip:
+        if clip.length > max_length:
+            max_length = clip.length
+return max_length
+```
+
+### 3. Progress Monitoring
+
+**Method**: `_check_scene_loop_progress()`
+
+**Called**: Every 5 ticks (~50-100ms) while scene loop is active
+
+**Logic**:
+1. Get maximum clip length in current scene
+2. Track elapsed time since scene started
+3. When elapsed time >= max_length, advance to next scene
+4. Skip empty scenes automatically
+
+```python
+current_time = song.get_current_beats_song_time().beats
+elapsed = current_time - self._scene_loop_start_time
+
+if elapsed >= max_length:
+    self._advance_to_next_scene()
+```
+
+### 4. Scene Progression
+
+**Method**: `_advance_to_next_scene()`
+
+**Progression pattern**: 5 → 6 → 7 → 8 → 5 (loop)
+
+```python
+self.scene_loop_current_scene += 1
+if self.scene_loop_current_scene > 8:
+    self.scene_loop_current_scene = 5  # Wrap back
+```
+
+**Actions on advancement**:
+1. Increment scene index (with wraparound)
+2. Reset timing tracking
+3. Fire all clips in new scene
+4. Resume progress monitoring
+
+## Scene Loop State Machine
+
+```
+[IDLE]
+  ↓ (user double-taps scene button 5)
+[ACTIVATE SCENE LOOP]
+  - scene_loop_active = True
+  - scene_loop_current_scene = 5
+  - Fire all clips in scene 5
+  ↓
+[MONITORING Scene 5]
+  - Track elapsed time vs max clip length
+  - Poll every 5 ticks
+  ↓
+[SCENE COMPLETE - at max_length]
+  - scene_loop_current_scene = 6
+  - Fire all clips in scene 6
+  ↓
+[MONITORING Scene 6] → ... → [Scene 7] → [Scene 8]
+  ↓
+[SCENE 8 COMPLETE]
+  - Wrap back to scene 5
+  - Continue loop
+  ↓ (or user double-taps scene button 1)
+[DEACTIVATE]
+  - scene_loop_active = False
+  - Clean up state
+  ↓
+[IDLE]
+```
 
 ## Technical Implementation Details
 
@@ -571,9 +720,10 @@ Same as **mle**:
 | Recording trigger | Manual per pad | Auto-cascade down column (one click) |
 | Transition | Immediate per-clip | Seamless anticipatory firing |
 | Monitoring | None | Active polling during recording |
-| State tracking | Shift/copy state only | + Cascade state + expected beats |
+| State tracking | Shift/copy state only | + Cascade state + expected beats + Scene loop state |
+| Scene loop | Not available | Double-tap scene 5 to activate, scene 1 to deactivate |
 | Product ID | 40 | 40 (same, mutually exclusive) |
-| Workflow | Hands-on per-layer control | Hands-free cascading layers |
+| Workflow | Hands-on per-layer control | Hands-free cascading layers + automated scene progression |
 | Performance | Direct clip manipulation | +Polling overhead (minimal) |
 
 ---
