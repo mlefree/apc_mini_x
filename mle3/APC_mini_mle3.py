@@ -38,6 +38,13 @@ DOUBLE_TAP_TIMEOUT_MS = 500
 # Cascade constants
 CASCADE_FIRE_THRESHOLD = 0.75
 
+def is_any_clip_playing(track):
+    for slot in track.clip_slots:
+        if slot.has_clip and slot.clip.is_playing:
+            return True
+    return False
+
+
 class ModeBase():
 
     def __init__(self, apc):
@@ -719,20 +726,24 @@ class APC_mini_mle3(APC_Key_25):
             if hasattr(self, 'cascade_next_fired'):
                 delattr(self, 'cascade_next_fired')
 
-        # Check if next slot is occupied
         next_track = song.tracks[next_track_index]
+
+        # Check if next slot is occupied (playing any slots or not empty)
+        next_is_playing = is_any_clip_playing(next_track)
+        self.log_message("MLE3 Cascade: next_is_playing v2:" + str(bool(next_is_playing)))
         next_clip_slot = next_track.clip_slots[self.cascade_clip_index]
-        if next_clip_slot.has_clip:
+        if next_is_playing or next_clip_slot.has_clip:
             self.log_message("=" * 60)
             self.log_message("MLE3 Cascade: STOPPED - occupied slot detected")
             self.log_message("  Next slot at track " + str(next_track_index) + " is occupied")
             self.log_message("  Playing first clip at track " + str(self.cascade_start_track_index))
             self.log_message("=" * 60)
             self.cascade_active = False
-
             # Clean up
             if hasattr(self, 'cascade_next_fired'):
                 delattr(self, 'cascade_next_fired')
+
+            return
 
         # Continue cascading
         if hasattr(self, 'cascade_next_fired'):
