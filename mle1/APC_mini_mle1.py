@@ -529,13 +529,13 @@ class QuantizeMode(ModeBase):
 
     def __init__(self, apc):
         ModeBase.__init__(self, apc)
-        self.apc.log_message("MLE: QuantizeMode initialized")
+        self.apc.log_message("MLE1: QuantizeMode initialized")
 
     def getName(self):
         return "quantize"
 
     def syncLights(self):
-        self.apc.log_message("MLE: QuantizeMode syncLights - current mode=" + str(self.apc.quantizeMode) + " (" + self.QUANTIZE_MODES.get(self.apc.quantizeMode, "unknown") + ")")
+        self.apc.log_message("MLE1: QuantizeMode syncLights - current mode=" + str(self.apc.quantizeMode) + " (" + self.QUANTIZE_MODES.get(self.apc.quantizeMode, "unknown") + ")")
         self.paintNumber(self.apc.quantizeMode)
         self.apc.really_do_send_midi((NOTE_ON_STATUS, BUTTON_ENTER, 0))
         self.apc.really_do_send_midi((NOTE_ON_STATUS, BUTTON_EXIT, 1))
@@ -551,24 +551,24 @@ class QuantizeMode(ModeBase):
     def custom_receive_midi(self, midi_bytes):
         if midi_bytes[0] & 240 == NOTE_ON_STATUS:
             note = midi_bytes[1]
-            self.apc.log_message("MLE: QuantizeMode received note=" + str(note))
+            self.apc.log_message("MLE1: QuantizeMode received note=" + str(note))
             if note == BUTTON_EXIT:
-                self.apc.log_message("MLE: QuantizeMode EXIT - going to root menu")
+                self.apc.log_message("MLE1: QuantizeMode EXIT - going to root menu")
                 self.gotoRootMenu()
             if note == BUTTON_NEXT and self.apc.quantizeMode < 8:
                 old_mode = self.apc.quantizeMode
                 self.apc.quantizeMode = self.apc.quantizeMode + 1
-                self.apc.log_message("MLE: QuantizeMode NEXT - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
+                self.apc.log_message("MLE1: QuantizeMode NEXT - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
                 self.syncLights()
             if note == BUTTON_PREV and self.apc.quantizeMode > 0:
                 old_mode = self.apc.quantizeMode
                 self.apc.quantizeMode = self.apc.quantizeMode - 1
-                self.apc.log_message("MLE: QuantizeMode PREV - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
+                self.apc.log_message("MLE1: QuantizeMode PREV - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
                 self.syncLights()
         return False
 
 
-class APC_mini_mle(APC_Key_25):
+class APC_mini_mle1(APC_Key_25):
     # @Overridden
     SESSION_HEIGHT = 8
     # @Overridden
@@ -590,11 +590,11 @@ class APC_mini_mle(APC_Key_25):
     # @Overridden
     def __init__(self, *a, **k):
         #super(APC_mini_mle, self).__init__(*a, **k)
-        (super(APC_mini_mle, self).__init__)(*a, **k)
+        (super(APC_mini_mle1, self).__init__)(*a, **k)
         with self.component_guard():
             self.register_disconnectable(SimpleLayerOwner(layer=Layer(_unused_buttons=(self.wrap_matrix(self._unused_buttons)))))
 
-        self.log_message("MLE - Fixed bar length mode")
+        self.log_message("MLE1: Fixed bar length mode")
         self.set_fixed_record_bar_length(self.RECORD_BAR_LENGTH)
         self._suppress_send_midi = False
         self.mode = None
@@ -607,13 +607,13 @@ class APC_mini_mle(APC_Key_25):
 
     # @Overridden
     def _create_controls(self):
-        super(APC_mini_mle, self)._create_controls()
+        super(APC_mini_mle1, self)._create_controls()
         self._unused_buttons = list(map(self.make_shifted_button, self._scene_launch_buttons[5:7]))
         self._master_volume_control = make_slider(0, 56, name='Master_Volume')
 
     # @Overridden
     def _create_mixer(self):
-        mixer = super(APC_mini_mle, self)._create_mixer()
+        mixer = super(APC_mini_mle1, self)._create_mixer()
         mixer.master_strip().layer = Layer(volume_control=(self._master_volume_control))
         return mixer
 
@@ -677,20 +677,20 @@ class APC_mini_mle(APC_Key_25):
         song = self.song()
         note = midi_bytes[1]
 
-        self.log_message("MLE _applyShiftMenu: note=" + str(note))
+        self.log_message("MLE1: _applyShiftMenu: note=" + str(note))
 
         if note == SHIFT_KEY:
             self.shiftPressed = True
             self.show_message("Shift + row 6 = metronome, row 7= undo")
-            self.log_message("MLE: SHIFT pressed")
+            self.log_message("MLE1: SHIFT pressed")
 
         if note == BUTTON_UNDO and self.shiftPressed:
-            self.log_message("MLE: UNDO triggered")
+            self.log_message("MLE1: UNDO triggered")
             song.undo()
             return True
 
         if note == BUTTON_METRONOME and self.shiftPressed:
-            self.log_message("MLE: METRONOME toggle")
+            self.log_message("MLE1: METRONOME toggle")
             song.tempo = round(song.tempo)
             song.metronome = not song.metronome
             return True
@@ -703,7 +703,7 @@ class APC_mini_mle(APC_Key_25):
                 current_rounded = int(round(song.tempo))
                 song.tempo = min(current_rounded + 1, MAX_TEMPO)
                 new_tempo = song.tempo
-                self.log_message("MLE: *** TEMPO UP *** old=" + str(old_tempo) + " new=" + str(new_tempo))
+                self.log_message("MLE1: *** TEMPO UP *** old=" + str(old_tempo) + " new=" + str(new_tempo))
                 self.show_message("Tempo: " + str(int(song.tempo)))
                 return True
 
@@ -713,47 +713,47 @@ class APC_mini_mle(APC_Key_25):
                 current_rounded = int(round(song.tempo))
                 song.tempo = max(current_rounded - 1, MIN_TEMPO)
                 new_tempo = song.tempo
-                self.log_message("MLE: *** TEMPO DOWN *** old=" + str(old_tempo) + " new=" + str(new_tempo))
+                self.log_message("MLE1: *** TEMPO DOWN *** old=" + str(old_tempo) + " new=" + str(new_tempo))
                 self.show_message("Tempo: " + str(int(song.tempo)))
                 return True
 
             # SHIFT + BUTTON_PREV: Tempo tap
             if note == BUTTON_PREV:
                 now = int(round(time.time() * 1000))
-                self.log_message("MLE: *** TEMPO TAP *** now=" + str(now) + " last=" + str(self.tempoTapMillis))
+                self.log_message("MLE1: *** TEMPO TAP *** now=" + str(now) + " last=" + str(self.tempoTapMillis))
                 if self.tempoTapMillis > 0 and now - self.tempoTapMillis < TAP_TEMPO_TIMEOUT_MS:
                     interval = now - self.tempoTapMillis
                     new_tempo = 60000.0 / interval
-                    self.log_message("MLE: TAP interval=" + str(interval) + "ms, calculated_tempo=" + str(new_tempo))
+                    self.log_message("MLE1: TAP interval=" + str(interval) + "ms, calculated_tempo=" + str(new_tempo))
                     if MIN_TEMPO <= new_tempo <= MAX_TEMPO:
                         song.tempo = new_tempo
-                        self.log_message("MLE: TAP tempo set to " + str(song.tempo))
+                        self.log_message("MLE1: TAP tempo set to " + str(song.tempo))
                         self.show_message("Tempo: " + str(int(song.tempo)) + " (tapped)")
                     else:
-                        self.log_message("MLE: TAP tempo out of range, ignored")
+                        self.log_message("MLE1: TAP tempo out of range, ignored")
                 else:
-                    self.log_message("MLE: TAP first tap or timeout, recording timestamp")
+                    self.log_message("MLE1: TAP first tap or timeout, recording timestamp")
                 self.tempoTapMillis = now
                 return True
 
             # SHIFT + BUTTON_NEXT: Start/Stop song
             if note == BUTTON_NEXT:
                 was_playing = song.is_playing
-                self.log_message("MLE: *** TRANSPORT START/STOP *** was_playing=" + str(was_playing))
+                self.log_message("MLE1: *** TRANSPORT START/STOP *** was_playing=" + str(was_playing))
                 if song.is_playing:
                     song.stop_playing()
-                    self.log_message("MLE: Transport STOPPED")
+                    self.log_message("MLE1: Transport STOPPED")
                     self.show_message("Stopped")
                 else:
                     song.start_playing()
-                    self.log_message("MLE: Transport STARTED")
+                    self.log_message("MLE1: Transport STARTED")
                     self.show_message("Playing")
                 return True
 
         # Double tap on note key => quantize
         now = int(round(time.time() * 1000))
         if note < 64:
-            self.log_message("MLE: Grid pad pressed, note=" + str(note))
+            self.log_message("MLE1: Grid pad pressed, note=" + str(note))
 
             trackIndex = self.getTrackIndex(note)
             track = song.tracks[trackIndex]
@@ -763,7 +763,7 @@ class APC_mini_mle(APC_Key_25):
                 if clipSlot.has_clip:
                     mode_names = {0: "off", 1: "1/4", 2: "1/8", 3: "1/8T", 4: "1/8+T", 5: "1/16", 6: "1/16T", 7: "1/16+T", 8: "1/32"}
                     mode_name = mode_names.get(self.quantizeMode, "unknown")
-                    self.log_message("MLE: Double-tap QUANTIZE - mode=" + str(self.quantizeMode) + " (" + mode_name + "), track=" + str(trackIndex) + ", clip=" + str(clipIndex))
+                    self.log_message("MLE1: Double-tap QUANTIZE - mode=" + str(self.quantizeMode) + " (" + mode_name + "), track=" + str(trackIndex) + ", clip=" + str(clipIndex))
                     clipSlot.clip.quantize(self.quantizeMode, 1)
                     self.show_message("Quantized: " + mode_name)
                     return True
@@ -782,13 +782,13 @@ class APC_mini_mle(APC_Key_25):
 
         # Recording launch on one note
         if note < 64:
-            self.log_message("MLE: Entering recording logic for note " + str(note))
+            self.log_message("MLE1: Entering recording logic for note " + str(note))
             trackIndex = self.getTrackIndex(note)
             track = song.tracks[trackIndex]
             clipIndex = self.getClipIndex(note)
             clipSlot = track.clip_slots[clipIndex]
 
-            self.log_message("MLE: Track=" + str(trackIndex) + ", Clip=" + str(clipIndex) +
+            self.log_message("MLE1: Track=" + str(trackIndex) + ", Clip=" + str(clipIndex) +
                            ", has_clip=" + str(clipSlot.has_clip) +
                            ", is_group=" + str(clipSlot.is_group_slot))
 
@@ -807,16 +807,16 @@ class APC_mini_mle(APC_Key_25):
 
             beatsPerBar = int(song.signature_numerator)
             beats = bars * beatsPerBar
-            self.log_message("MLE: Calculated bars=" + str(bars) + ", beats=" + str(beats))
+            self.log_message("MLE1: Calculated bars=" + str(bars) + ", beats=" + str(beats))
 
             if not clipSlot.has_clip and not clipSlot.is_group_slot:
-                self.log_message("MLE: STARTING RECORD!")
+                self.log_message("MLE1: STARTING RECORD!")
                 track.arm = True
-                self.log_message("MLE: Track armed, firing clip with " + str(beats) + " beats")
+                self.log_message("MLE1: Track armed, firing clip with " + str(beats) + " beats")
                 clipSlot.fire(beats)
                 return True
             else:
-                self.log_message("MLE: Clip exists or is group slot, stopping session_record")
+                self.log_message("MLE1: Clip exists or is group slot, stopping session_record")
                 song.session_record = False
 
         return False
@@ -827,38 +827,38 @@ class APC_mini_mle(APC_Key_25):
         # will cause changes to lights
         if self.mode != None:
             return
-        super(APC_mini_mle, self)._do_send_midi(midi_bytes)
+        super(APC_mini_mle1, self)._do_send_midi(midi_bytes)
 
     # Used by edit modes to echo edit ops as lighting messages unrelated to usual Live clip events
     def really_do_send_midi(self, midi_bytes):
-        super(APC_mini_mle, self)._do_send_midi(midi_bytes)
+        super(APC_mini_mle1, self)._do_send_midi(midi_bytes)
 
     # @Overridden receive_midi
     def receive_midi(self, midi_bytes):
 
-        self.log_message("MLE receive_midi: " + str(midi_bytes))
+        self.log_message("MLE1: receive_midi: " + str(midi_bytes))
         extra_conf_applied = False
 
         # Custom Modes
         if self.mode is not None:
-            self.log_message("MLE: *** IN MENU MODE - Press button 65 to exit ***")
+            self.log_message("MLE1: *** IN MENU MODE - Press button 65 to exit ***")
             self.mode.custom_receive_midi(midi_bytes)
             return
 
         # Shift released or applied
         if midi_bytes[0] & 240 == NOTE_OFF_STATUS:
-            self.log_message("MLE: NOTE_OFF detected")
+            self.log_message("MLE1: NOTE_OFF detected")
             extra_conf_applied = self._releaseShiftMenu(midi_bytes)
         elif midi_bytes[0] & 240 == NOTE_ON_STATUS:
-            self.log_message("MLE: NOTE_ON detected - calling _applyShiftMenu")
+            self.log_message("MLE1: NOTE_ON detected - calling _applyShiftMenu")
             extra_conf_applied = self._applyShiftMenu(midi_bytes)
 
         # Transfer to Parent
         if not extra_conf_applied:
-            self.log_message("MLE: Passing to parent class")
-            super(APC_mini_mle, self).receive_midi(midi_bytes)
+            self.log_message("MLE1: Passing to parent class")
+            super(APC_mini_mle1, self).receive_midi(midi_bytes)
         else:
-            self.log_message("MLE: Handled by mle logic")
+            self.log_message("MLE1: Handled by mle logic")
 
     def fixed_record_bar_length(self):
         return self.__fixed_record_bar_length

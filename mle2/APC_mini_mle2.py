@@ -534,13 +534,13 @@ class QuantizeMode(ModeBase):
 
     def __init__(self, apc):
         ModeBase.__init__(self, apc)
-        self.apc.log_message("MLE: QuantizeMode initialized")
+        self.apc.log_message("MLE2: QuantizeMode initialized")
 
     def getName(self):
         return "quantize"
 
     def syncLights(self):
-        self.apc.log_message("MLE: QuantizeMode syncLights - current mode=" + str(self.apc.quantizeMode) + " (" + self.QUANTIZE_MODES.get(self.apc.quantizeMode, "unknown") + ")")
+        self.apc.log_message("MLE2: QuantizeMode syncLights - current mode=" + str(self.apc.quantizeMode) + " (" + self.QUANTIZE_MODES.get(self.apc.quantizeMode, "unknown") + ")")
         self.paintNumber(self.apc.quantizeMode)
         self.apc.really_do_send_midi((NOTE_ON_STATUS, BUTTON_ENTER, 0))
         self.apc.really_do_send_midi((NOTE_ON_STATUS, BUTTON_EXIT, 1))
@@ -556,19 +556,19 @@ class QuantizeMode(ModeBase):
     def custom_receive_midi(self, midi_bytes):
         if midi_bytes[0] & 240 == NOTE_ON_STATUS:
             note = midi_bytes[1]
-            self.apc.log_message("MLE: QuantizeMode received note=" + str(note))
+            self.apc.log_message("MLE2: QuantizeMode received note=" + str(note))
             if note == BUTTON_EXIT:
-                self.apc.log_message("MLE: QuantizeMode EXIT - going to root menu")
+                self.apc.log_message("MLE2: QuantizeMode EXIT - going to root menu")
                 self.gotoRootMenu()
             if note == BUTTON_NEXT and self.apc.quantizeMode < 8:
                 old_mode = self.apc.quantizeMode
                 self.apc.quantizeMode = self.apc.quantizeMode + 1
-                self.apc.log_message("MLE: QuantizeMode NEXT - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
+                self.apc.log_message("MLE2: QuantizeMode NEXT - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
                 self.syncLights()
             if note == BUTTON_PREV and self.apc.quantizeMode > 0:
                 old_mode = self.apc.quantizeMode
                 self.apc.quantizeMode = self.apc.quantizeMode - 1
-                self.apc.log_message("MLE: QuantizeMode PREV - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
+                self.apc.log_message("MLE2: QuantizeMode PREV - changed from " + str(old_mode) + " to " + str(self.apc.quantizeMode))
                 self.syncLights()
         return False
 
@@ -660,7 +660,7 @@ class APC_mini_mle2(APC_Key_25):
         clip_slot = track.clip_slots[self.cascade_current_clip_index]
 
         if not clip_slot.has_clip:
-            self.log_message("MLE: WARNING - Clip disappeared during polling!")
+            self.log_message("MLE2: WARNING - Clip disappeared during polling!")
             return
 
         clip = clip_slot.clip
@@ -674,7 +674,7 @@ class APC_mini_mle2(APC_Key_25):
             # Anticipatory firing: trigger next clip at 75% of current recording
             # For 4-bar loops: fires at beat 12 of 16, giving 4 beats overlap
             if current_beat >= expected_length * CASCADE_FIRE_THRESHOLD and not hasattr(self, 'cascade_next_fired'):
-                self.log_message("MLE Cascade: Reached " + str(int(CASCADE_FIRE_THRESHOLD * 100)) + "% at beat " +
+                self.log_message("MLE2: Cascade: Reached " + str(int(CASCADE_FIRE_THRESHOLD * 100)) + "% at beat " +
                                str(round(current_beat, 1)) + "/" + str(expected_length) + ", firing next clip")
                 self.cascade_next_fired = True
                 self._continue_cascade()
@@ -687,7 +687,7 @@ class APC_mini_mle2(APC_Key_25):
             if hasattr(self, 'cascade_next_fired'):
                 delattr(self, 'cascade_next_fired')
             else:
-                self.log_message("MLE Cascade: Clip finished recording at row " + str(self.cascade_current_clip_index))
+                self.log_message("MLE2: Cascade: Clip finished recording at row " + str(self.cascade_current_clip_index))
                 self._continue_cascade()
 
     def _continue_cascade(self):
@@ -703,7 +703,7 @@ class APC_mini_mle2(APC_Key_25):
 
         # Check cascade completion: reached bottom or occupied slot
         if next_clip_index >= 8 or track.clip_slots[next_clip_index].has_clip:
-            self.log_message("MLE Cascade: Complete! Playing first clip at row " + str(self.cascade_start_clip_index))
+            self.log_message("MLE2: Cascade: Complete! Playing first clip at row " + str(self.cascade_start_clip_index))
             self.cascade_active = False
 
             # Clean up state flags
@@ -719,9 +719,9 @@ class APC_mini_mle2(APC_Key_25):
             first_clip_slot = track.clip_slots[self.cascade_start_clip_index]
             if first_clip_slot.has_clip:
                 first_clip_slot.fire()
-                self.log_message("MLE Cascade: Started playback from row " + str(self.cascade_start_clip_index))
+                self.log_message("MLE2: Cascade: Started playback from row " + str(self.cascade_start_clip_index))
             else:
-                self.log_message("MLE Cascade: ERROR - First clip missing at row " + str(self.cascade_start_clip_index))
+                self.log_message("MLE2: Cascade: ERROR - First clip missing at row " + str(self.cascade_start_clip_index))
             return
 
         # Continue cascading
@@ -747,7 +747,7 @@ class APC_mini_mle2(APC_Key_25):
         beatsPerBar = int(song.signature_numerator)
         beats = bars * beatsPerBar
 
-        self.log_message("MLE Cascade: Recording next clip at row " + str(next_clip_index) + " with " + str(beats) + " beats")
+        self.log_message("MLE2: Cascade: Recording next clip at row " + str(next_clip_index) + " with " + str(beats) + " beats")
 
         # Store expected length for anticipatory firing
         self.cascade_expected_beats = beats
@@ -772,14 +772,14 @@ class APC_mini_mle2(APC_Key_25):
         clip_slot = track.clip_slots[self.cascade_current_clip_index]
 
         if clip_slot.has_clip:
-            self.log_message("MLE: Monitoring row " + str(self.cascade_current_clip_index))
+            self.log_message("MLE2: Monitoring row " + str(self.cascade_current_clip_index))
             self._check_cascade_progress()
         else:
             # Retry up to 100 times (~2 seconds max)
             if retry_count < 100:
                 self.schedule_message(1, lambda: self._start_cascade_polling(retry_count + 1))
             else:
-                self.log_message("MLE: ERROR - Clip creation timeout, aborting cascade")
+                self.log_message("MLE2: ERROR - Clip creation timeout, aborting cascade")
                 self.cascade_active = False
 
     def _get_scene_max_clip_length(self, scene_index):
@@ -807,7 +807,7 @@ class APC_mini_mle2(APC_Key_25):
         song = self.song()
         clips_fired = 0
 
-        self.log_message("MLE Scene Loop: Firing clips at index " + str(scene_index) +
+        self.log_message("MLE2: Scene Loop: Firing clips at index " + str(scene_index) +
                         " (button " + str(scene_index + 1) + ")")
 
         for track in song.tracks:
@@ -817,7 +817,7 @@ class APC_mini_mle2(APC_Key_25):
                     clip_slot.fire()
                     clips_fired += 1
 
-        self.log_message("MLE Scene Loop: Fired " + str(clips_fired) + " clips")
+        self.log_message("MLE2: Scene Loop: Fired " + str(clips_fired) + " clips")
         return clips_fired
 
     def _schedule_next_scene(self):
@@ -832,7 +832,7 @@ class APC_mini_mle2(APC_Key_25):
 
         # Don't schedule if song stopped
         if not song.is_playing:
-            self.log_message("MLE Scene Loop: Song stopped, not scheduling next scene")
+            self.log_message("MLE2: Scene Loop: Song stopped, not scheduling next scene")
             self._deactivate_scene_loop()
             return
 
@@ -840,12 +840,12 @@ class APC_mini_mle2(APC_Key_25):
 
         # Get max clip length in current scene
         max_length_beats = self._get_scene_max_clip_length(current_scene)
-        self.log_message("MLE Scene Loop: Scene " + str(current_scene) + " max length = " +
+        self.log_message("MLE2: Scene Loop: Scene " + str(current_scene) + " max length = " +
                         str(max_length_beats) + " beats")
 
         if max_length_beats == 0:
             # No clips, move to next immediately
-            self.log_message("MLE Scene Loop: Scene " + str(current_scene) + " has no clips, advancing")
+            self.log_message("MLE2: Scene Loop: Scene " + str(current_scene) + " has no clips, advancing")
             self._advance_to_next_scene()
             return
 
@@ -855,7 +855,7 @@ class APC_mini_mle2(APC_Key_25):
         seconds = max_length_beats * (60.0 / tempo)
         ticks = int(seconds * 10)
 
-        self.log_message("MLE Scene Loop: Will advance in " + str(round(seconds, 1)) +
+        self.log_message("MLE2: Scene Loop: Will advance in " + str(round(seconds, 1)) +
                         " seconds (" + str(ticks) + " ticks at " + str(tempo) + " BPM)")
 
         # Schedule the advancement with current session ID
@@ -869,7 +869,7 @@ class APC_mini_mle2(APC_Key_25):
         """
         # Ignore callbacks from old sessions
         if session_id != self.scene_loop_session_id:
-            self.log_message("MLE Scene Loop: Ignoring callback from old session (ID " +
+            self.log_message("MLE2: Scene Loop: Ignoring callback from old session (ID " +
                            str(session_id) + " vs current " + str(self.scene_loop_session_id) + ")")
             return
 
@@ -880,7 +880,7 @@ class APC_mini_mle2(APC_Key_25):
 
         # If song stopped, deactivate
         if not song.is_playing:
-            self.log_message("MLE Scene Loop: Song stopped, deactivating scene loop")
+            self.log_message("MLE2: Scene Loop: Song stopped, deactivating scene loop")
             self._deactivate_scene_loop()
             return
 
@@ -890,7 +890,7 @@ class APC_mini_mle2(APC_Key_25):
         # Wrap back to scene button 5 (clip index 4) after scene button 8 (clip index 7)
         if self.scene_loop_current_scene > 7:
             self.scene_loop_current_scene = 4
-            self.log_message("MLE Scene Loop: Looping back to scene button 5 (index 4)")
+            self.log_message("MLE2: Scene Loop: Looping back to scene button 5 (index 4)")
 
         # Reset timing tracking
         if hasattr(self, '_scene_loop_started'):
@@ -908,11 +908,11 @@ class APC_mini_mle2(APC_Key_25):
         """
         Activate scene loop - loop through scene buttons 5-8 (clip indices 4-7).
         """
-        self.log_message("MLE: ACTIVATING SCENE LOOP MODE")
+        self.log_message("MLE2: ACTIVATING SCENE LOOP MODE")
 
         # Increment session ID to invalidate pending callbacks from previous sessions
         self.scene_loop_session_id += 1
-        self.log_message("MLE Scene Loop: New session ID = " + str(self.scene_loop_session_id))
+        self.log_message("MLE2: Scene Loop: New session ID = " + str(self.scene_loop_session_id))
 
         self.scene_loop_active = True
         self.scene_loop_current_scene = 4  # Scene button 5 = clip index 4
@@ -927,7 +927,7 @@ class APC_mini_mle2(APC_Key_25):
 
         # Start transport if not playing
         if not song.is_playing:
-            self.log_message("MLE Scene Loop: Starting transport")
+            self.log_message("MLE2: Scene Loop: Starting transport")
             song.start_playing()
 
         # Fire clips in scene button 5 (clip index 4) to start
@@ -942,7 +942,7 @@ class APC_mini_mle2(APC_Key_25):
         """
         Deactivate scene loop - return to normal operation.
         """
-        self.log_message("MLE: DEACTIVATING SCENE LOOP MODE")
+        self.log_message("MLE2: DEACTIVATING SCENE LOOP MODE")
         self.scene_loop_active = False
 
         # Clean up state
@@ -1001,12 +1001,12 @@ class APC_mini_mle2(APC_Key_25):
         song = self.song()
         note = midi_bytes[1]
 
-        self.log_message("MLE _applyShiftMenu: note=" + str(note))
+        self.log_message("MLE2: _applyShiftMenu: note=" + str(note))
 
         if note == SHIFT_KEY:
             self.shiftPressed = True
             self.show_message("Shift + row 6 = metronome, row 7= undo")
-            self.log_message("MLE: SHIFT pressed")
+            self.log_message("MLE2: SHIFT pressed")
 
         # Scene button 5 - Double tap to activate scene loop
         if note == BUTTON_SCENE_5:
@@ -1031,12 +1031,12 @@ class APC_mini_mle2(APC_Key_25):
                 return False
 
         if note == BUTTON_UNDO and self.shiftPressed:
-            self.log_message("MLE: UNDO triggered")
+            self.log_message("MLE2: UNDO triggered")
             song.undo()
             return True
 
         if note == BUTTON_METRONOME and self.shiftPressed:
-            self.log_message("MLE: METRONOME toggle")
+            self.log_message("MLE2: METRONOME toggle")
             song.tempo = round(song.tempo)
             song.metronome = not song.metronome
             return True
@@ -1049,7 +1049,7 @@ class APC_mini_mle2(APC_Key_25):
                 current_rounded = int(round(song.tempo))
                 song.tempo = min(current_rounded + 1, MAX_TEMPO)
                 new_tempo = song.tempo
-                self.log_message("MLE: *** TEMPO UP *** old=" + str(old_tempo) + " new=" + str(new_tempo))
+                self.log_message("MLE2: *** TEMPO UP *** old=" + str(old_tempo) + " new=" + str(new_tempo))
                 self.show_message("Tempo: " + str(int(song.tempo)))
                 return True
 
@@ -1059,47 +1059,47 @@ class APC_mini_mle2(APC_Key_25):
                 current_rounded = int(round(song.tempo))
                 song.tempo = max(current_rounded - 1, MIN_TEMPO)
                 new_tempo = song.tempo
-                self.log_message("MLE: *** TEMPO DOWN *** old=" + str(old_tempo) + " new=" + str(new_tempo))
+                self.log_message("MLE2: *** TEMPO DOWN *** old=" + str(old_tempo) + " new=" + str(new_tempo))
                 self.show_message("Tempo: " + str(int(song.tempo)))
                 return True
 
             # SHIFT + BUTTON_PREV: Tempo tap
             if note == BUTTON_PREV:
                 now = int(round(time.time() * 1000))
-                self.log_message("MLE: *** TEMPO TAP *** now=" + str(now) + " last=" + str(self.tempoTapMillis))
+                self.log_message("MLE2: *** TEMPO TAP *** now=" + str(now) + " last=" + str(self.tempoTapMillis))
                 if self.tempoTapMillis > 0 and now - self.tempoTapMillis < TAP_TEMPO_TIMEOUT_MS:
                     interval = now - self.tempoTapMillis
                     new_tempo = 60000.0 / interval
-                    self.log_message("MLE: TAP interval=" + str(interval) + "ms, calculated_tempo=" + str(new_tempo))
+                    self.log_message("MLE2: TAP interval=" + str(interval) + "ms, calculated_tempo=" + str(new_tempo))
                     if MIN_TEMPO <= new_tempo <= MAX_TEMPO:
                         song.tempo = new_tempo
-                        self.log_message("MLE: TAP tempo set to " + str(song.tempo))
+                        self.log_message("MLE2: TAP tempo set to " + str(song.tempo))
                         self.show_message("Tempo: " + str(int(song.tempo)) + " (tapped)")
                     else:
-                        self.log_message("MLE: TAP tempo out of range, ignored")
+                        self.log_message("MLE2: TAP tempo out of range, ignored")
                 else:
-                    self.log_message("MLE: TAP first tap or timeout, recording timestamp")
+                    self.log_message("MLE2: TAP first tap or timeout, recording timestamp")
                 self.tempoTapMillis = now
                 return True
 
             # SHIFT + BUTTON_NEXT: Start/Stop song
             if note == BUTTON_NEXT:
                 was_playing = song.is_playing
-                self.log_message("MLE: *** TRANSPORT START/STOP *** was_playing=" + str(was_playing))
+                self.log_message("MLE2: *** TRANSPORT START/STOP *** was_playing=" + str(was_playing))
                 if song.is_playing:
                     song.stop_playing()
-                    self.log_message("MLE: Transport STOPPED")
+                    self.log_message("MLE2: Transport STOPPED")
                     self.show_message("Stopped")
                 else:
                     song.start_playing()
-                    self.log_message("MLE: Transport STARTED")
+                    self.log_message("MLE2: Transport STARTED")
                     self.show_message("Playing")
                 return True
 
         # Double tap on grid pad => quantize
         now = int(round(time.time() * 1000))
         if note < 64:
-            self.log_message("MLE: Grid pad pressed, note=" + str(note))
+            self.log_message("MLE2: Grid pad pressed, note=" + str(note))
 
             trackIndex = self.getTrackIndex(note)
             track = song.tracks[trackIndex]
@@ -1109,7 +1109,7 @@ class APC_mini_mle2(APC_Key_25):
                 if clipSlot.has_clip:
                     mode_names = {0: "off", 1: "1/4", 2: "1/8", 3: "1/8T", 4: "1/8+T", 5: "1/16", 6: "1/16T", 7: "1/16+T", 8: "1/32"}
                     mode_name = mode_names.get(self.quantizeMode, "unknown")
-                    self.log_message("MLE: Double-tap QUANTIZE - mode=" + str(self.quantizeMode) + " (" + mode_name + "), track=" + str(trackIndex) + ", clip=" + str(clipIndex))
+                    self.log_message("MLE2: Double-tap QUANTIZE - mode=" + str(self.quantizeMode) + " (" + mode_name + "), track=" + str(trackIndex) + ", clip=" + str(clipIndex))
                     clipSlot.clip.quantize(self.quantizeMode, 1)
                     self.show_message("Quantized: " + mode_name)
                     return True
@@ -1128,13 +1128,13 @@ class APC_mini_mle2(APC_Key_25):
 
         # Recording launch
         if note < 64:
-            self.log_message("MLE: Entering recording logic for note " + str(note))
+            self.log_message("MLE2: Entering recording logic for note " + str(note))
             trackIndex = self.getTrackIndex(note)
             track = song.tracks[trackIndex]
             clipIndex = self.getClipIndex(note)
             clipSlot = track.clip_slots[clipIndex]
 
-            self.log_message("MLE: Track=" + str(trackIndex) + ", Clip=" + str(clipIndex) +
+            self.log_message("MLE2: Track=" + str(trackIndex) + ", Clip=" + str(clipIndex) +
                            ", has_clip=" + str(clipSlot.has_clip) +
                            ", is_group=" + str(clipSlot.is_group_slot))
 
@@ -1153,11 +1153,11 @@ class APC_mini_mle2(APC_Key_25):
 
             beatsPerBar = int(song.signature_numerator)
             beats = bars * beatsPerBar
-            self.log_message("MLE: Calculated bars=" + str(bars) + ", beats=" + str(beats))
+            self.log_message("MLE2: Calculated bars=" + str(bars) + ", beats=" + str(beats))
 
             if not clipSlot.has_clip and not clipSlot.is_group_slot:
                 # Start cascading record mode
-                self.log_message("MLE: STARTING CASCADE RECORD!")
+                self.log_message("MLE2: STARTING CASCADE RECORD!")
                 self.cascade_active = True
                 self.cascade_track_index = trackIndex
                 self.cascade_start_clip_index = clipIndex
@@ -1169,13 +1169,13 @@ class APC_mini_mle2(APC_Key_25):
                 if hasattr(self, 'cascade_completed'):
                     delattr(self, 'cascade_completed')
 
-                self.log_message("MLE Cascade: Starting at row " + str(clipIndex))
+                self.log_message("MLE2: Cascade: Starting at row " + str(clipIndex))
 
                 # Store expected length for anticipatory firing
                 self.cascade_expected_beats = beats
 
                 track.arm = True
-                self.log_message("MLE: Track armed, firing clip with " + str(beats) + " beats")
+                self.log_message("MLE2: Track armed, firing clip with " + str(beats) + " beats")
                 clipSlot.fire(beats)
 
                 # Start polling
@@ -1183,7 +1183,7 @@ class APC_mini_mle2(APC_Key_25):
 
                 return True
             else:
-                self.log_message("MLE: Clip exists or is group slot, stopping session_record")
+                self.log_message("MLE2: Clip exists or is group slot, stopping session_record")
                 song.session_record = False
 
         return False
@@ -1203,29 +1203,29 @@ class APC_mini_mle2(APC_Key_25):
     # @Overridden receive_midi
     def receive_midi(self, midi_bytes):
 
-        self.log_message("MLE receive_midi: " + str(midi_bytes))
+        self.log_message("MLE2: receive_midi: " + str(midi_bytes))
         extra_conf_applied = False
 
         # Custom Modes
         if self.mode is not None:
-            self.log_message("MLE: *** IN MENU MODE - Press button 65 to exit ***")
+            self.log_message("MLE2: *** IN MENU MODE - Press button 65 to exit ***")
             self.mode.custom_receive_midi(midi_bytes)
             return
 
         # Shift released or applied
         if midi_bytes[0] & 240 == NOTE_OFF_STATUS:
-            self.log_message("MLE: NOTE_OFF detected")
+            self.log_message("MLE2: NOTE_OFF detected")
             extra_conf_applied = self._releaseShiftMenu(midi_bytes)
         elif midi_bytes[0] & 240 == NOTE_ON_STATUS:
-            self.log_message("MLE: NOTE_ON detected - calling _applyShiftMenu")
+            self.log_message("MLE2: NOTE_ON detected - calling _applyShiftMenu")
             extra_conf_applied = self._applyShiftMenu(midi_bytes)
 
         # Transfer to Parent
         if not extra_conf_applied:
-            self.log_message("MLE: Passing to parent class")
+            self.log_message("MLE2: Passing to parent class")
             super(APC_mini_mle2, self).receive_midi(midi_bytes)
         else:
-            self.log_message("MLE: Handled by mle2 logic")
+            self.log_message("MLE2: Handled by mle2 logic")
 
     def fixed_record_bar_length(self):
         return self.__fixed_record_bar_length
