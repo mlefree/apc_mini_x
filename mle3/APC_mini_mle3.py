@@ -675,20 +675,6 @@ class APC_mini_mle3(APC_Key_25):
 
             # Anticipatory firing: trigger next clip at 75% of current recording
             if current_beat >= expected_length * CASCADE_FIRE_THRESHOLD and not hasattr(self, 'cascade_next_fired'):
-                # Blink next pad as visual feedback
-                # next_track_index = self.cascade_current_track_index + 1
-                # if next_track_index < 8:
-                #     song = self.song()
-                #     if next_track_index < len(song.tracks):
-                #         next_clip_slot = song.tracks[next_track_index].clip_slots[self.cascade_clip_index]
-                #         if not next_clip_slot.has_clip:
-                #             # Blink next pad
-                #             next_note = self.cascade_clip_index * 8 + next_track_index
-                #             rowStart = self.rowStarts[7 - self.cascade_clip_index]
-                #             next_note_corrected = rowStart + next_track_index
-                #             self.really_do_send_midi((NOTE_ON_STATUS, next_note_corrected, BAR_BLINK))
-                #             self.log_message("MLE3 Cascade: Blinking next pad at track " + str(next_track_index))
-
                 self.log_message("=" * 60)
                 self.log_message("MLE3 Cascade: THRESHOLD REACHED!")
                 self.log_message("  Current beat: " + str(round(current_beat, 1)))
@@ -733,22 +719,6 @@ class APC_mini_mle3(APC_Key_25):
             if hasattr(self, 'cascade_next_fired'):
                 delattr(self, 'cascade_next_fired')
 
-            # # Stop the last recorded clip if playing
-            # current_track = song.tracks[self.cascade_current_track_index]
-            # current_clip_slot = current_track.clip_slots[self.cascade_clip_index]
-            # if current_clip_slot.has_clip and current_clip_slot.clip.is_playing:
-            #     current_clip_slot.clip.stop()
-
-            # # Fire first clip to start playback
-            # first_track = song.tracks[self.cascade_start_track_index]
-            # first_clip_slot = first_track.clip_slots[self.cascade_clip_index]
-            # if first_clip_slot.has_clip:
-            #     first_clip_slot.fire()
-            #     self.log_message("MLE3 Cascade: Started playback from track " + str(self.cascade_start_track_index))
-            # else:
-            #     self.log_message("MLE3 Cascade: ERROR - First clip missing at track " + str(self.cascade_start_track_index))
-            # return
-
         # Check if next slot is occupied
         next_track = song.tracks[next_track_index]
         next_clip_slot = next_track.clip_slots[self.cascade_clip_index]
@@ -763,14 +733,6 @@ class APC_mini_mle3(APC_Key_25):
             # Clean up
             if hasattr(self, 'cascade_next_fired'):
                 delattr(self, 'cascade_next_fired')
-
-            # # Fire first clip
-            # first_track = song.tracks[self.cascade_start_track_index]
-            # first_clip_slot = first_track.clip_slots[self.cascade_clip_index]
-            # if first_clip_slot.has_clip:
-            #     first_clip_slot.fire()
-            #     self.log_message("MLE3 Cascade: Started playback from track " + str(self.cascade_start_track_index))
-            # return
 
         # Continue cascading
         if hasattr(self, 'cascade_next_fired'):
@@ -845,9 +807,6 @@ class APC_mini_mle3(APC_Key_25):
                 self.log_message("  Aborting cascade")
                 self.log_message("=" * 60)
                 self.cascade_active = False
-
-    # Need rowStarts for blinking calculation
-    rowStarts = [56, 48, 40, 32, 24, 16, 8, 0]
 
     def _releaseShiftMenu(self, midi_bytes):
 
