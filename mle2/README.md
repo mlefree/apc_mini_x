@@ -2,11 +2,11 @@
 
 Cascading record mode - one click fills the entire column automatically.
 
-Based on **mle** with automatic vertical recording: press one pad, watch it cascade down recording each row below with the same bar length, then loop back to play. Perfect for hands-free layered loop building.
+Based on **mle1** with automatic vertical recording: press one pad, watch it cascade down recording each row below with the same bar length, then loop back to play. Perfect for hands-free layered loop building.
 
 ## Philosophy
 
-**mle2** takes the opinionated bar-length workflow of **mle** and adds cascading automation. Instead of manually recording each layer, you trigger one pad and let the script build your vertical loop stack automatically. This is ideal for:
+**mle2** takes the opinionated bar-length workflow of **mle1** and adds cascading automation. Instead of manually recording each layer, you trigger one pad and let the script build your vertical loop stack automatically. This is ideal for:
 
 - Building complex layers without breaking flow
 - Creating evolving textures that develop over time
@@ -95,17 +95,17 @@ All from **one button press**.
 - Encounters an already-occupied pad
 - Then automatically plays the first clip
 
+The cascade only triggers on **empty pads**.
+
 ### Standard Recording (Non-Cascade)
 
 If you want to record **without** cascading, record on a pad that:
 - Already has a clip (replaces it)
 - Is in a column with existing clips
 
-The cascade only triggers on **empty pads in empty columns**.
-
 ### Playback & Session Control
 
-Same as **mle**:
+Same as **mle1**:
 - **Launch clips**: Press a pad to play/stop
 - **Stop all**: Bottom scene button
 - **Delete**: Shift + clip
@@ -143,13 +143,13 @@ A powerful performance feature that cycles through scenes 5-8 automatically:
 
 **Access**: Double-tap `SHIFT`
 
-Same menu system as **mle**:
+Same menu system as **mle1**:
 1. **Bar Length** for tracks 6-8
 2. **BPM/Tempo** adjustment and tap tempo
 3. **Metronome** toggle
 4. **Paint Mode** (grid art)
 
-See **mle** documentation for full menu details.
+See **mle1** documentation for full menu details.
 
 ## Workflow Examples
 
@@ -198,12 +198,12 @@ See **mle** documentation for full menu details.
 
 ## Architecture
 
-Extends **mle** (`APC_mini_mle`) with cascading record automation using **anticipatory firing** via polling.
+Extends **mle1** (`APC_mini_mle`) with cascading record automation using **anticipatory firing** via polling.
 
 ### File Structure
 ```
 mle2/
-├── __init__.py              # Entry point (product ID: 40, same as mle)
+├── __init__.py              # Entry point (product ID: 40, same as mle1)
 ├── APC_mini_mle2.py         # Main script with cascade logic
 └── README.md                # This file
 ```
@@ -252,7 +252,7 @@ if not clipSlot.has_clip and not clipSlot.is_group_slot:
     self.schedule_message(2, lambda: self._start_cascade_polling(0))
 ```
 
-**Key differences from mle**:
+**Key differences from mle1**:
 - Sets `cascade_expected_beats` to track recording length
 - Starts polling instead of waiting for clip to finish
 
@@ -349,7 +349,7 @@ def _start_cascade_polling(self, retry_count=0):
 
 ```
 [IDLE]
-  ↓ (user presses empty pad in empty column)
+  ↓ (user presses empty pad)
 [START CASCADE]
   - cascade_active = True
   - cascade_expected_beats = beats
@@ -560,7 +560,7 @@ During recording, `clip.length` returns a huge internal value (63072000.0) inste
 
 ```python
 def _product_model_id_byte(self):
-    return 40  # Same as mle
+    return 40  # Same as mle1
 ```
 
 Must match `__init__.py`:
@@ -569,7 +569,7 @@ controller_id(vendor_id=2536, product_ids=[40],
               model_name='APC MINI MLE2')
 ```
 
-**Important**: Uses same product ID as mle (40). Only one can be active at a time in Ableton.
+**Important**: Uses same product ID as mle1 (40). Only one can be active at a time in Ableton.
 
 ## Customization Points
 
@@ -647,7 +647,7 @@ self.really_do_send_midi((NOTE_ON_STATUS, note, 2))  # Blink
 ```python
 # In _applyShiftMenu(), before starting cascade:
 if trackIndex in [0, 7]:  # Don't cascade on tracks 0 and 7
-    # Use original mle behavior
+    # Use original mle1 behavior
     track.arm = True
     clipSlot.fire(beats)
     return True
@@ -700,7 +700,7 @@ self.log_message("MLE2 DEBUG: position=" + str(current_beat) +
 
 ## Dependencies
 
-Same as **mle**:
+Same as **mle1**:
 - Ableton Live 11+ (tested with 12.2.6)
 - `_Framework` module (built into Live)
 - `APC_Key_25` parent class
@@ -713,9 +713,9 @@ Same as **mle**:
 
 **No event listeners used** - polling approach is more reliable for our use case.
 
-## Differences from mle
+## Differences from mle1
 
-| Feature | mle | mle2 |
+| Feature | mle1 | mle2 |
 |---------|-----|------|
 | Recording trigger | Manual per pad | Auto-cascade down column (one click) |
 | Transition | Immediate per-clip | Seamless anticipatory firing |
@@ -729,4 +729,3 @@ Same as **mle**:
 ---
 
 *One click, infinite layers - let the grid do the work*
-

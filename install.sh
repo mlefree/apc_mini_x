@@ -2,7 +2,7 @@
 
 set -o errexit -o nounset
 
-PROJECTS=('mle' 'mle2')
+PROJECTS=('mle1' 'mle2' 'mle3')
 
 ABLETON_HOME="$HOME/Music/Ableton/User Library"
 ABLETON_MRS="$ABLETON_HOME/Remote Scripts"
@@ -28,4 +28,3 @@ do
 done
 
 echo "Installation done."
-

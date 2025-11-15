@@ -1,10 +1,10 @@
-# APC mini mle
+# APC mini mle1
 
 Opinionated MIDI remote script for Ableton Live with fixed bar lengths per track and streamlined live looping workflow.
 
 ## Philosophy
 
-**mle** is designed around a simple idea: different tracks have different purposes. Instead of fiddling with loop lengths mid-performance, tracks have predetermined bar counts optimized for typical live looping workflows:
+**mle1** is designed around a simple idea: different tracks have different purposes. Instead of fiddling with loop lengths mid-performance, tracks have predetermined bar counts optimized for typical live looping workflows:
 
 - **Track 1**: Quick hits and fills (1 bar)
 - **Tracks 2-3**: Rhythmic elements (2 bars)
@@ -67,7 +67,7 @@ This lets you focus on playing, not configuring.
 
 **Quantize a clip**:
 - Double-tap a clip to quantize it
-- Quantize mode: 1/16 + 1/16T (triplet)
+- Default quantize mode: 1/16 + 1/16T (configurable via menu, see "Quantize Mode Setup" below)
 
 ### Session Control
 
@@ -117,7 +117,27 @@ Sets the fixed bar length for tracks 6-8.
 - Button 67 or any grid pad: Toggle metronome
 - Button 65: Exit
 
-#### 4. Paint Mode (Grid Editor)
+#### 4. Quantize Mode Setup
+**Display**: Shows quantize mode number on grid
+**Controls**:
+- Button 67: Next quantize mode (+1)
+- Button 66: Previous quantize mode (-1)
+- Button 65: Save and exit
+
+**Available modes**:
+- 0 = Off (no quantization)
+- 1 = 1/4 (quarter note)
+- 2 = 1/8 (eighth note)
+- 3 = 1/8T (eighth note triplet)
+- 4 = 1/8 + 1/8T
+- 5 = 1/16 (sixteenth note)
+- 6 = 1/16T (sixteenth note triplet)
+- 7 = 1/16 + 1/16T - **default**
+- 8 = 1/32 (thirty-second note)
+
+This setting determines which quantization is applied when you double-tap a clip.
+
+#### 5. Paint Mode (Grid Editor)
 **Display**: Your custom pattern
 **Controls**:
 - Press pads to cycle through brightness: 0 → 1 → 3 → 5 → 0
@@ -147,7 +167,7 @@ Built on Ableton's `APC_Key_25` control surface framework with custom MIDI handl
 
 ### File Structure
 ```
-mle/
+mle1/
 ├── __init__.py              # Entry point, capabilities
 ├── APC_mini_mle.py          # Main script
 └── README.md                # This file
@@ -188,6 +208,7 @@ mode                         # Current menu mode (None = normal)
 - `RecordBarsMode`: Bar length configuration
 - `TapTempoMode`: BPM adjustment
 - `MetronomeMode`: Metronome toggle
+- `QuantizeMode`: Quantization mode selection
 - `PaintMode`: Grid painter (Easter egg)
 
 Each mode implements:
@@ -321,7 +342,7 @@ def _product_model_id_byte(self):
 Must match `__init__.py`:
 ```python
 controller_id(vendor_id=2536, product_ids=[40],
-              model_name='APC MINI MLE')
+              model_name='APC MINI MLE1')
 ```
 
 ## Customization Points
